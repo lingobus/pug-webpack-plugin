@@ -13,15 +13,20 @@ const fs = require('fs');
 const fsExtra = require('fs-extra')
 const SingleEntryPlugin = require("webpack/lib/SingleEntryPlugin");
 const vm = require("vm");
+const AsyncSeriesWaterfallHook = require('tapable').AsyncSeriesWaterfallHook;
 
-module.exports = class PugWebpackPlugin {
+const hooks = {
+  afterEmit: new AsyncSeriesWaterfallHook(['arg1'])
+}
+
+class PugWebpackPlugin {
   constructor (options) {
     this.options = options
-    this.name = 'pug-webpack-plugin'
+    this.name = 'PugWebpackPlugin'
   }
   apply (compiler) {
     // callback is called when css,js is emited
-    compiler.hooks.emit.tap(this.name, compilation => {
+    compiler.hooks.emit.tapAsync(this.name, (compilation, callback) => {
       // read pug template
       const entryFileBuffer = fs.readFileSync(this.options.template)
 
@@ -32,7 +37,7 @@ module.exports = class PugWebpackPlugin {
 
       // copy pug dependences to /build for express view engine
       deps.forEach(srcPath => {
-        const destPath = path.resolve(this.options.buildPath, path.relative(this.options.srcPath, srcPath))
+        const destPath = path.resolve(this.options.outputPath, path.relative(this.options.context, srcPath))
         fsExtra.copySync(srcPath, destPath)
       })
 
@@ -95,11 +100,6 @@ ${cssBlock}
       }
 
       // find and replace require('*') with xxxHTMLLINKxxx*xxx placeholder
-      const destPath = path.resolve(
-        this.options.buildPath,
-        this.options.output,
-      )
-
       let requireCount = 0
       content = content.replace(/require\(['|"]([^()]*)['|"]\)/g, (match, url) => {
         requireCount++
@@ -114,25 +114,54 @@ ${cssBlock}
           filename: url,
           publicPath: this.options.publicPath
         });
-
         new SingleEntryPlugin(compilation.compiler.context, resourcePath).apply(childCompiler)
+
+        let source
+        childCompiler.plugin("after-compile", (compilation, callback) => {
+          source = compilation.assets[url] && compilation.assets[url].source();
+          // Remove all chunk assets
+          compilation.chunks.forEach(function(chunk) {
+            chunk.files.forEach(function(file) {
+              delete compilation.assets[file];
+            });
+          });
+          callback();
+        })
+
         childCompiler.runAsChild((err, entries, childCompilation) => {
+          // add file dependencies for hmr
+          childCompilation.fileDependencies.forEach((dep) => {
+            compilation.fileDependencies.add(dep)
+          })
           // run the emited js source, get hashed url or base64 content back and replace the placeholer with it
-          const source = childCompilation.assets[url] && childCompilation.assets[url].source();
           const hashedUrl = vm.runInThisContext(source)
           content = content.replace(ident, _ => "'" + hashedUrl + "'")
           if (requireCount) requireCount--
           if (!requireCount) {
-            fsExtra.outputFileSync(destPath, content)
-            if (this.options.reloadPageFn) this.options.reloadPageFn()
+            emitPugTemplate.call(this, content, callback)
           }
         });
 
         return ident // replace require('*') with placeloader
       })
       if (!requireCount) {
+        emitPugTemplate.call(this, content, callback)
+      }
+
+      function emitPugTemplate (content, callback) {
+        const destPath = path.resolve(
+          this.options.outputPath,
+          path.relative(this.options.context, this.options.template)
+        )
         fsExtra.outputFileSync(destPath, content)
-        if (this.options.reloadPageFn) this.options.reloadPageFn()
+        callback()
+        // if (this.options.reloadPageFn) this.options.reloadPageFn()
+        hooks.afterEmit.promise({
+          plugin: this
+        }).catch(err => {
+          console.error(err);
+          return null;
+        }).then(() => null)
       }
     })
 
@@ -168,3 +197,6 @@ ${cssBlock}
     }
   }
 }
+
+PugWebpackPlugin.hooks = hooks
+module.exports = PugWebpackPlugin

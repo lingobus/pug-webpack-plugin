@@ -1,0 +1,9 @@
+extends ./_base
+
+block root
+  #root
+    h1 pug-webpack-plugin demo
+    p base64 img
+    img(src=require('./image-small.jpg'))
+    p hashed url img
+    img(src=require('./image-large.png'))

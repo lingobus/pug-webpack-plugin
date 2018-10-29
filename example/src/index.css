@@ -1,0 +1,18 @@
+#root {
+  text-align: center;
+  padding: 50px;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: bold;
+  text-align: center;
+}
+
+img {
+  display: inline-block;
+}
+
+p {
+  margin-top: 50px;
+}
