@@ -106,8 +106,15 @@ ${cssBlock}
         // generate placeloader
         const ident = randomIdent()
 
-        // get the full resource path
-        const resourcePath = path.join(this.options.template.substring(0, this.options.template.lastIndexOf('/')), url)
+        // resolve alias and get the full resource path
+        let resourcePath
+        const alias = (compiler.options.resolve || {}).alias
+        if (alias && url[0] !== '/' && url[0] !== '.') {
+          const k = url.substring(0, url.indexOf('/'))
+          resourcePath = alias[k] + url.substring(url.indexOf('/'), url.length)
+        } else {
+          resourcePath = path.join(this.options.template.substring(0, this.options.template.lastIndexOf('/')), url)
+        }
 
         // create child compiler to handle require
         const childCompiler = compilation.createChildCompiler(url, {
