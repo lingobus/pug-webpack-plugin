@@ -74,7 +74,7 @@ block webpackEmitedJs`
       let cssBlock = `
 block webpackEmitedCss`
       const allChunks = compilation.getStats().toJson(chunkOnlyConfig).chunks
-      const chunks = filterChunks(allChunks)
+      const chunks = filterChunks(allChunks, this.options.includes, this.options.excludes)
       chunks.forEach(chunk => {
         chunk.files.forEach(name => {
           if (/\.css$/.test(name)) { // append css link

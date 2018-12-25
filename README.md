@@ -8,7 +8,7 @@ pug-webpack-plugin:
 5. pug hot reload
 
 # install
-yarn add lingobus/pug-webpack-plugin#v0.0.3 --dev
+yarn add lingobus/pug-webpack-plugin#v0.0.5 --dev
 
 # Example
 see example folder
@@ -30,6 +30,7 @@ params:
 - context: source full path
 - template: pug template file full path
 - outputPath: build full path
+- excludes: excluded chunks not to be injected
 
 hooks:
 - afterEmit: after pug template generated
